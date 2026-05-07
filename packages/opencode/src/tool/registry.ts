@@ -46,6 +46,8 @@ import { Bus } from "../bus"
 import { Agent } from "../agent/agent"
 import { Skill } from "../skill"
 import { Permission } from "@/permission"
+import { UpdateGoalTool, GoalStatusTool } from "./goal"
+import { Goal as GoalService } from "@/session/goal"
 
 const log = Log.create({ service: "tool.registry" })
 
@@ -88,6 +90,7 @@ export const layer: Layer.Layer<
   | Ripgrep.Service
   | Format.Service
   | Truncate.Service
+  | GoalService.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -114,6 +117,8 @@ export const layer: Layer.Layer<
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
     const agent = yield* Agent.Service
+    const updategoal = yield* UpdateGoalTool
+    const goalstatus = yield* GoalStatusTool
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("ToolRegistry.state")(function* (ctx) {
@@ -210,6 +215,8 @@ export const layer: Layer.Layer<
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
+          updategoal: Tool.init(updategoal),
+          goalstatus: Tool.init(goalstatus),
         })
 
         return {
@@ -229,6 +236,8 @@ export const layer: Layer.Layer<
             tool.search,
             tool.skill,
             tool.patch,
+            tool.goalstatus,
+            tool.updategoal,
             ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [tool.lsp] : []),
             ...(Flag.OPENCODE_EXPERIMENTAL_PLAN_MODE && Flag.OPENCODE_CLIENT === "cli" ? [tool.plan] : []),
           ],
@@ -286,6 +295,8 @@ export const layer: Layer.Layer<
         if (tool.id === WebSearchTool.id) {
           return input.providerID === ProviderID.opencode || Flag.OPENCODE_ENABLE_EXA
         }
+
+        if (input.agent.name === "plan" && tool.id === UpdateGoalTool.id) return false
 
         const usePatch =
           input.modelID.includes("gpt-") && !input.modelID.includes("oss") && !input.modelID.includes("gpt-4")
@@ -350,6 +361,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(CrossSpawnSpawner.defaultLayer),
     Layer.provide(Ripgrep.defaultLayer),
     Layer.provide(Truncate.defaultLayer),
+    Layer.provide(GoalService.defaultLayer),
   ),
 )
 

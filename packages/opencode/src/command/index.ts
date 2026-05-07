@@ -1,4 +1,4 @@
-import { BusEvent } from "@/bus/bus-event"
+import { BusEvent } from "@/bus-bus-event"
 import { InstanceState } from "@/effect/instance-state"
 import { EffectBridge } from "@/effect/bridge"
 import type { InstanceContext } from "@/project/instance"
@@ -12,7 +12,7 @@ import { MCP } from "../mcp"
 import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
-import { GOAL_COMMAND, goalCommandInfo } from "./goal-cmd"
+import PROMPT_GOAL from "./template/goal.txt"
 
 type State = {
   commands: Record<string, Info>
@@ -60,6 +60,7 @@ export function hints(template: string) {
 export const Default = {
   INIT: "init",
   REVIEW: "review",
+  GOAL: "goal",
 } as const
 
 export interface Interface {
@@ -100,12 +101,14 @@ export const layer = Layer.effect(
         subtask: true,
         hints: hints(PROMPT_REVIEW),
       }
-      commands[GOAL_COMMAND] = {
-        ...goalCommandInfo,
+      commands[Default.GOAL] = {
+        name: Default.GOAL,
+        description: "set a goal and track progress with budget and status",
+        source: "command",
         get template() {
-          return ""
+          return PROMPT_GOAL
         },
-        hints: [],
+        hints: hints(PROMPT_GOAL),
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {

@@ -1,243 +1,228 @@
-import { Database } from "@/storage/db"
-import { eq, and } from "drizzle-orm"
-import { GoalTable, type GoalStatus, type GoalConstraints } from "./goal.sql"
-import { SessionID } from "./schema"
-import { InstanceState } from "@/effect/instance-state"
 import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
+import { SessionID } from "./schema"
 import { Effect, Layer, Context, Schema } from "effect"
-import { NonNegativeInt, optionalOmitUndefined, withStatics } from "@/util/schema"
-import { zod } from "@/util/effect-zod"
+import { Database } from "@/storage/db"
+import { eq } from "drizzle-orm"
+import { GoalTable } from "./goal.sql"
 
-export const GoalInfo = Schema.Struct({
-  id: Schema.String,
-  sessionID: SessionID,
+export const Status = Schema.Literals(["active", "complete", "paused", "budget_limited"])
+export type Status = Schema.Schema.Type<typeof Status>
+
+export const Info = Schema.Struct({
   objective: Schema.String,
-  status: Schema.Literals(["active", "paused", "complete", "failed", "budget_limited"]),
-  tokenBudget: optionalOmitUndefined(Schema.NonNegativeInt),
-  tokensUsed: NonNegativeInt,
-  constraints: optionalOmitUndefined(
-    Schema.Struct({
-      fileScope: optionalOmitUndefined(Schema.Array(Schema.String)),
-      approvalOverride: optionalOmitUndefined(Schema.Boolean),
-    }),
-  ),
-  startedAt: optionalOmitUndefined(Schema.NonNegativeInt),
-  completedAt: optionalOmitUndefined(Schema.NonNegativeInt),
-  timeCreated: NonNegativeInt,
-  timeUpdated: NonNegativeInt,
+  status: Status,
+  tokenBudget: Schema.optional(Schema.Number).annotate({ description: "null means unlimited" }),
+  tokensUsed: Schema.Number,
+  timeUsedSeconds: Schema.Number,
 })
-  .annotate({ identifier: "Goal" })
-  .pipe(withStatics((s) => ({ zod: zod(s) })))
-export type GoalInfo = Schema.Schema.Type<typeof GoalInfo>
+export type Info = Schema.Schema.Type<typeof Info>
 
 export const Event = {
+  Set: BusEvent.define(
+    "goal.set",
+    Schema.Struct({
+      sessionID: SessionID,
+      objective: Schema.String,
+      tokenBudget: Schema.optional(Schema.Number),
+    }),
+  ),
   Updated: BusEvent.define(
     "goal.updated",
     Schema.Struct({
       sessionID: SessionID,
-      goal: GoalInfo,
+      goal: Info,
     }),
   ),
-  Completed: BusEvent.define(
-    "goal.completed",
+  Cleared: BusEvent.define(
+    "goal.cleared",
     Schema.Struct({
       sessionID: SessionID,
-      goal: GoalInfo,
     }),
   ),
-  BudgetLimited: BusEvent.define(
-    "goal.budget_limited",
+  BudgetExhausted: BusEvent.define(
+    "goal.budget_exhausted",
     Schema.Struct({
       sessionID: SessionID,
-      goal: GoalInfo,
-      tokensUsed: NonNegativeInt,
-      tokenBudget: NonNegativeInt,
+      tokensUsed: Schema.Number,
+      tokenBudget: Schema.Number,
     }),
   ),
 }
 
 export interface Interface {
-  readonly create: (input: {
-    sessionID: SessionID
-    objective: string
-    tokenBudget?: number
-    constraints?: GoalConstraints
-  }) => Effect.Effect<GoalInfo>
-  readonly get: (sessionID: SessionID) => Effect.Effect<GoalInfo | undefined>
-  readonly update: (
-    sessionID: SessionID,
-    input: {
-      objective?: string
-      status?: GoalStatus
-      tokensUsed?: number
-    },
-  ) => Effect.Effect<GoalInfo | undefined>
+  readonly set: (input: { sessionID: SessionID; objective: string; tokenBudget?: number }) => Effect.Effect<void>
+  readonly get: (sessionID: SessionID) => Effect.Effect<Info | undefined>
   readonly clear: (sessionID: SessionID) => Effect.Effect<void>
-  readonly pause: (sessionID: SessionID) => Effect.Effect<GoalInfo | undefined>
-  readonly resume: (sessionID: SessionID) => Effect.Effect<GoalInfo | undefined>
-  readonly complete: (sessionID: SessionID) => Effect.Effect<GoalInfo | undefined>
-  readonly fail: (sessionID: SessionID, reason?: string) => Effect.Effect<GoalInfo | undefined>
-  readonly setBudgetLimited: (sessionID: SessionID) => Effect.Effect<GoalInfo | undefined>
+  readonly updateStatus: (input: { sessionID: SessionID; status: Status }) => Effect.Effect<void>
+  readonly addTokens: (input: { sessionID: SessionID; tokens: number; durationSeconds?: number }) => Effect.Effect<void>
+  readonly shouldContinue: (sessionID: SessionID, stepTokens: number) => Effect.Effect<{
+    shouldContinue: boolean
+    budgetWarning: boolean
+    budgetExhausted: boolean
+  }>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/Goal") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/SessionGoal") {}
 
-export const layer: Layer.Layer<Service, never, Database.Service | Bus.Service> = Layer.effect(
+const fromRow = (row: typeof GoalTable.$inferSelect): Info => ({
+  objective: row.objective,
+  status: row.status as Status,
+  tokenBudget: row.token_budget ?? undefined,
+  tokensUsed: row.tokens_used,
+  timeUsedSeconds: row.time_used_seconds,
+})
+
+export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const db = yield* Database.Service
     const bus = yield* Bus.Service
 
-    const state = yield* InstanceState.make(
-      Effect.fn("Goal.state")(() => Effect.succeed(new Map<SessionID, GoalInfo>())),
-    )
-
-    const toInfo = (row: typeof GoalTable.$inferSelect): GoalInfo => ({
-      id: row.id,
-      sessionID: row.session_id,
-      objective: row.objective,
-      status: row.status,
-      tokenBudget: row.token_budget ?? undefined,
-      tokensUsed: row.tokens_used,
-      constraints:
-        row.constraints
-          ? {
-              fileScope: row.constraints.file_scope,
-              approvalOverride: row.constraints.approval_override,
-            }
-          : undefined,
-      startedAt: row.started_at ?? undefined,
-      completedAt: row.completed_at ?? undefined,
-      timeCreated: row.time_created,
-      timeUpdated: row.time_updated,
-    })
-
-    const create = Effect.fn("Goal.create")(function* (input: {
+    const set = Effect.fn("SessionGoal.set")(function* (input: {
       sessionID: SessionID
       objective: string
       tokenBudget?: number
-      constraints?: GoalConstraints
     }) {
-      const existing = yield* db.query.row(
-        GoalTable,
-        eq(GoalTable.session_id, input.sessionID),
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db
+            .insert(GoalTable)
+            .values({
+              session_id: input.sessionID,
+              objective: input.objective,
+              token_budget: input.tokenBudget ?? null,
+            })
+            .onConflictDoUpdate({
+              target: GoalTable.session_id,
+              set: {
+                objective: input.objective,
+                status: "active",
+                token_budget: input.tokenBudget ?? null,
+                tokens_used: 0,
+                time_used_seconds: 0,
+                time_updated: Date.now(),
+              },
+            })
+            .run(),
+        ),
       )
-      if (existing) {
-        yield* db.query.remove(GoalTable, eq(GoalTable.session_id, input.sessionID))
-      }
-
-      const now = Date.now()
-      const id = `goal_${now}_${Math.random().toString(36).slice(2, 9)}`
-      const row: typeof GoalTable.$inferInsert = {
-        id,
-        session_id: input.sessionID,
+      yield* bus.publish(Event.Set, {
+        sessionID: input.sessionID,
         objective: input.objective,
-        status: "active",
-        token_budget: input.tokenBudget ?? null,
-        tokens_used: 0,
-        constraints: input.constraints ?? null,
-        started_at: now,
-        time_created: now,
-        time_updated: now,
-      }
+        tokenBudget: input.tokenBudget,
+      })
+    })
 
-      yield* db.query.insert(GoalTable, row)
-      const info = toInfo(row)
-
-      yield* state.pipe(
-        Effect.flatMap((s) => Effect.succeed(s.set(input.sessionID, info))),
+    const get = Effect.fn("SessionGoal.get")(function* (sessionID: SessionID) {
+      const row = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(GoalTable).where(eq(GoalTable.session_id, sessionID)).get()),
       )
-      yield* bus.publish(Event.Updated, { sessionID: input.sessionID, goal: info })
-      return info
+      if (!row) return undefined
+      return fromRow(row)
     })
 
-    const get = Effect.fn("Goal.get")(function* (sessionID: SessionID) {
-      const cached = yield* state.pipe(Effect.flatMap((s) => Effect.succeed(s.get(sessionID))))
-      if (cached) return cached
-
-      const row = yield* db.query.row(GoalTable, eq(GoalTable.session_id, sessionID))
-      if (!row) return
-      const info = toInfo(row)
-      yield* state.pipe(Effect.flatMap((s) => Effect.succeed(s.set(sessionID, info))))
-      return info
+    const clear = Effect.fn("SessionGoal.clear")(function* (sessionID: SessionID) {
+      yield* Effect.sync(() => Database.use((db) => db.delete(GoalTable).where(eq(GoalTable.session_id, sessionID)).run()))
+      yield* bus.publish(Event.Cleared, { sessionID })
     })
 
-    const update = Effect.fn("Goal.update")(function* (
-      sessionID: SessionID,
-      input: {
-        objective?: string
-        status?: GoalStatus
-        tokensUsed?: number
-      },
-    ) {
-      const existing = yield* db.query.row(GoalTable, eq(GoalTable.session_id, sessionID))
-      if (!existing) return
-
-      const now = Date.now()
-      const updates: Partial<typeof GoalTable.$inferInsert> = { time_updated: now }
-      if (input.objective !== undefined) updates.objective = input.objective
-      if (input.status !== undefined) {
-        updates.status = input.status
-        if (input.status === "complete" || input.status === "failed" || input.status === "budget_limited") {
-          updates.completed_at = now
-        }
+    const updateStatus = Effect.fn("SessionGoal.updateStatus")(function* (input: {
+      sessionID: SessionID
+      status: Status
+    }) {
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db
+            .update(GoalTable)
+            .set({ status: input.status, time_updated: Date.now() })
+            .where(eq(GoalTable.session_id, input.sessionID))
+            .run(),
+        ),
+      )
+      const row = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(GoalTable).where(eq(GoalTable.session_id, input.sessionID)).get()),
+      )
+      if (row) {
+        yield* bus.publish(Event.Updated, { sessionID: input.sessionID, goal: fromRow(row) })
       }
-      if (input.tokensUsed !== undefined) updates.tokens_used = input.tokensUsed
+    })
 
-      yield* db.query.update(GoalTable, eq(GoalTable.session_id, sessionID), updates)
-      const updated = yield* db.query.row(GoalTable, eq(GoalTable.session_id, sessionID))
-      if (!updated) return
-      const info = toInfo(updated)
-      yield* state.pipe(Effect.flatMap((s) => Effect.succeed(s.set(sessionID, info))))
-      yield* bus.publish(Event.Updated, { sessionID, goal: info })
+    const addTokens = Effect.fn("SessionGoal.addTokens")(function* (input: {
+      sessionID: SessionID
+      tokens: number
+      durationSeconds?: number
+    }) {
+      const row = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(GoalTable).where(eq(GoalTable.session_id, input.sessionID)).get()),
+      )
+      if (!row || row.status !== "active") return
 
-      if (info.status === "complete") {
-        yield* bus.publish(Event.Completed, { sessionID, goal: info })
-      } else if (info.status === "budget_limited") {
-        yield* bus.publish(Event.BudgetLimited, {
-          sessionID,
-          goal: info,
-          tokensUsed: info.tokensUsed,
-          tokenBudget: info.tokenBudget ?? 0,
+      const newTokensUsed = row.tokens_used + input.tokens
+      const newTimeUsed = row.time_used_seconds + (input.durationSeconds ?? 0)
+
+      yield* Effect.sync(() =>
+        Database.use((db) =>
+          db
+            .update(GoalTable)
+            .set({
+              tokens_used: newTokensUsed,
+              time_used_seconds: newTimeUsed,
+              time_updated: Date.now(),
+            })
+            .where(eq(GoalTable.session_id, input.sessionID))
+            .run(),
+        ),
+      )
+
+      if (row.token_budget && newTokensUsed >= row.token_budget && row.tokens_used < row.token_budget) {
+        yield* Effect.sync(() =>
+          Database.use((db) =>
+            db
+              .update(GoalTable)
+              .set({ status: "budget_limited", time_updated: Date.now() })
+              .where(eq(GoalTable.session_id, input.sessionID))
+              .run(),
+          ),
+        )
+        yield* bus.publish(Event.BudgetExhausted, {
+          sessionID: input.sessionID,
+          tokensUsed: newTokensUsed,
+          tokenBudget: row.token_budget,
         })
       }
 
-      return info
+      const updated = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(GoalTable).where(eq(GoalTable.session_id, input.sessionID)).get()),
+      )
+      if (updated) {
+        yield* bus.publish(Event.Updated, { sessionID: input.sessionID, goal: fromRow(updated) })
+      }
     })
 
-    const clear = Effect.fn("Goal.clear")(function* (sessionID: SessionID) {
-      yield* db.query.remove(GoalTable, eq(GoalTable.session_id, sessionID))
-      yield* state.pipe(Effect.flatMap((s) => Effect.succeed(s.delete(sessionID))))
+    const shouldContinue = Effect.fn("SessionGoal.shouldContinue")(function* (sessionID: SessionID, stepTokens: number) {
+      const row = yield* Effect.sync(() =>
+        Database.use((db) => db.select().from(GoalTable).where(eq(GoalTable.session_id, sessionID)).get()),
+      )
+      if (!row) return { shouldContinue: true, budgetWarning: false, budgetExhausted: false }
+      if (row.status !== "active") return { shouldContinue: false, budgetWarning: false, budgetExhausted: false }
+
+      if (!row.token_budget) return { shouldContinue: true, budgetWarning: false, budgetExhausted: false }
+
+      const totalEstimated = row.tokens_used + stepTokens
+      const budgetWarning = totalEstimated >= row.token_budget * 0.75 && row.tokens_used < row.token_budget * 0.75
+      const budgetExhausted = totalEstimated >= row.token_budget
+
+      return {
+        shouldContinue: !budgetExhausted,
+        budgetWarning,
+        budgetExhausted,
+      }
     })
 
-    const pause = Effect.fn("Goal.pause")(function* (sessionID: SessionID) {
-      return yield* update(sessionID, { status: "paused" })
-    })
-
-    const resume = Effect.fn("Goal.resume")(function* (sessionID: SessionID) {
-      return yield* update(sessionID, { status: "active" })
-    })
-
-    const complete = Effect.fn("Goal.complete")(function* (sessionID: SessionID) {
-      return yield* update(sessionID, { status: "complete" })
-    })
-
-    const fail = Effect.fn("Goal.fail")(function* (sessionID: SessionID, _reason?: string) {
-      return yield* update(sessionID, { status: "failed" })
-    })
-
-    const setBudgetLimited = Effect.fn("Goal.setBudgetLimited")(function* (sessionID: SessionID) {
-      return yield* update(sessionID, { status: "budget_limited" })
-    })
-
-    return Service.of({ create, get, update, clear, pause, resume, complete, fail, setBudgetLimited })
+    return Service.of({ set, get, clear, updateStatus, addTokens, shouldContinue })
   }),
 )
 
-export const defaultLayer = layer.pipe(
-  Layer.provide(Database.defaultLayer),
-  Layer.provide(Bus.layer),
-)
+export const defaultLayer = layer.pipe(Layer.provide(Bus.layer))
 
 export * as Goal from "./goal"

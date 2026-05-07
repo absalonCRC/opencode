@@ -1,0 +1,15 @@
+## Goal Mode: Budget Warning
+
+You have used **75% of your token budget** for this goal.
+
+**Required Assessment:**
+1. How much progress has been made toward the goal?
+2. What specific items remain?
+3. Can the remaining work be completed within the remaining budget?
+
+**Options:**
+- If major items are complete and the core goal is achieved: use `update_goal` with `status="complete"` to declare success
+- If significant work remains: prioritize explicitly and continue with only the most critical items
+- If the remaining work would exceed budget: summarize what was accomplished and what remains, then call `update_goal` with `status="paused"`
+
+**Do not continue working without making this assessment.**

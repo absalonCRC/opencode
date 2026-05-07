@@ -48,6 +48,7 @@ import { Process } from "@/util/process"
 import { Cause, Effect, Exit, Latch, Layer, Option, Scope, Context, Schema, Types } from "effect"
 import { zod } from "@/util/effect-zod"
 import { withStatics } from "@/util/schema"
+import { Goal as GoalService } from "@/session/goal"
 import * as EffectLogger from "@opencode-ai/core/effect/logger"
 import { InstanceState } from "@/effect/instance-state"
 import { TaskTool, type TaskPromptOps } from "@/tool/task"
@@ -116,6 +117,7 @@ export const layer = Layer.effect(
     const summary = yield* SessionSummary.Service
     const sys = yield* SystemPrompt.Service
     const llm = yield* LLM.Service
+    const goalsvc = yield* GoalService.Service
     const runner = Effect.fn("SessionPrompt.runner")(function* () {
       return yield* EffectBridge.make()
     })
@@ -1572,6 +1574,23 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
             const system = [...env, ...instructions, ...(skills ? [skills] : [])]
+
+            const goalInfo = yield* goalsvc.get(sessionID)
+            if (goalInfo && goalInfo.status === "active") {
+              const budgetInfo = goalInfo.tokenBudget
+                ? ` (Budget: ${goalInfo.tokensUsed}/${goalInfo.tokenBudget} tokens)`
+                : ""
+              system.push(`<system-reminder>
+You are working toward the following goal: "${goalInfo.objective}"${budgetInfo}
+Use the update_goal tool to update the goal status (active/complete/paused) as you make progress.
+If no token budget is set, you can set one with update_goal to track progress.
+</system-reminder>`)
+            } else if (goalInfo && goalInfo.status === "budget_limited") {
+              system.push(`<system-reminder>
+The token budget for goal "${goalInfo.objective}" has been exhausted.
+Consider marking this goal as complete or pausing it with update_goal.
+</system-reminder>`)
+            }
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
@@ -1607,6 +1626,12 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             }
 
             if (result === "stop") return "break" as const
+
+            const totalTokens = handle.message.tokens.input + handle.message.tokens.output + handle.message.tokens.reasoning
+            if (totalTokens > 0 && goalInfo && goalInfo.status === "active") {
+              yield* goalsvc.addTokens({ sessionID, tokens: totalTokens }).pipe(Effect.ignore)
+            }
+
             if (result === "compact") {
               yield* compaction.create({
                 sessionID,
@@ -1788,6 +1813,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(Session.defaultLayer),
     Layer.provide(SessionRevert.defaultLayer),
     Layer.provide(SessionSummary.defaultLayer),
+    Layer.provide(GoalService.defaultLayer),
     Layer.provide(
       Layer.mergeAll(
         Agent.defaultLayer,

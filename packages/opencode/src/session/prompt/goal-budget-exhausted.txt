@@ -1,0 +1,13 @@
+## Goal Mode: Budget Exhausted
+
+**Token budget has been exhausted. The goal loop must stop.**
+
+This is not a failure - autonomous work has limits and you've hit yours.
+
+**Final Requirements:**
+1. Summarize what WAS accomplished
+2. List what REMAINED incomplete
+3. Provide specific next steps for any incomplete items
+4. Suggest how to continue manually if needed
+
+**Do not attempt any more tool calls.**

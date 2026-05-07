@@ -1,29 +1,23 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core"
 import { SessionTable } from "./session.sql"
+import type { SessionID } from "./schema"
 import { Timestamps } from "../storage/schema.sql"
 
 export const GoalTable = sqliteTable(
   "goal",
   {
-    id: text().primaryKey(),
     session_id: text()
-      .notNull()
+      .$type<SessionID>()
+      .primaryKey()
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     objective: text().notNull(),
-    status: text({ mode: "json" }).$type<GoalStatus>().notNull().default("active"),
+    status: text().notNull().$default(() => "active"),
     token_budget: integer(),
-    tokens_used: integer().notNull().default(0),
-    constraints: text({ mode: "json" }).$type<GoalConstraints>(),
-    started_at: integer(),
-    completed_at: integer(),
+    tokens_used: integer().notNull().$default(() => 0),
+    time_used_seconds: integer().notNull().$default(() => 0),
     ...Timestamps,
   },
-  (table) => [],
+  (table) => [
+    index("goal_session_idx").on(table.session_id),
+  ],
 )
-
-export type GoalStatus = "active" | "paused" | "complete" | "failed" | "budget_limited"
-
-export type GoalConstraints = {
-  file_scope?: string[]
-  approval_override?: boolean
-}
