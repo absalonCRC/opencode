@@ -1,0 +1,6 @@
+Manage goal success criteria. Criteria are conditions that must be met for the goal to be considered complete.
+
+Actions:
+- add: Add a new success criterion with a description.
+- verify: Mark a criterion as verified. Optionally specify the verification method used.
+- list: List all success criteria for the current goal.

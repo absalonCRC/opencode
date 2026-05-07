@@ -1,0 +1,7 @@
+Get the current status of the active goal including:
+- The goal text
+- Budget allocation and tokens used
+- Progress on checkpoints (completed vs total)
+- Progress on success criteria (verified vs total)
+- Estimated budget needs based on current plan
+- Whether the goal is marked complete

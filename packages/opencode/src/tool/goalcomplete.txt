@@ -1,0 +1,6 @@
+Mark the current goal as complete. Provide a verification summary explaining how success was verified.
+
+This should only be called when:
+1. All checkpoints are completed
+2. All success criteria are verified
+3. The work has been verified through actual inspection of files, tests, or builds
