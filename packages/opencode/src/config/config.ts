@@ -287,6 +287,9 @@ export const Info = Schema.Struct({
       continue_loop_on_deny: Schema.optional(Schema.Boolean).annotate({
         description: "Continue the agent loop when a tool call is denied",
       }),
+      goals: Schema.optional(Schema.Boolean).annotate({
+        description: "Enable persistent goal feature — agent continues until objective is reached or budget exhausted",
+      }),
       mcp_timeout: Schema.optional(PositiveInt).annotate({
         description: "Timeout in milliseconds for model context protocol (MCP) requests",
       }),

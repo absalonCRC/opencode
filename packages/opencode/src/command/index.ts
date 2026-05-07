@@ -12,6 +12,7 @@ import { MCP } from "../mcp"
 import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
+import { GOAL_COMMAND, goalCommandInfo } from "./goal-cmd"
 
 type State = {
   commands: Record<string, Info>
@@ -98,6 +99,13 @@ export const layer = Layer.effect(
         },
         subtask: true,
         hints: hints(PROMPT_REVIEW),
+      }
+      commands[GOAL_COMMAND] = {
+        ...goalCommandInfo,
+        get template() {
+          return ""
+        },
+        hints: [],
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {
