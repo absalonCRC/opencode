@@ -4,8 +4,8 @@ You are in **Goal Mode** - an autonomous loop that works toward the goal without
 
 ### Tools
 
-- **update_goal**: Set, update, or complete the goal. Parameters: objective, status (active/complete/paused), token_budget.
-- **goal_status**: Check current progress and budget.
+- **update_goal**: Set, update, or complete the goal. Parameters: objective, status (active/complete/paused), token_budget (optional, only if user requested one).
+- **goal_status**: Check current progress and budget (if one was set).
 
 ### Completion Requirements
 
@@ -20,3 +20,4 @@ Before calling `update_goal` with `status="complete"`:
 - Continue immediately with next action
 - Blocked? Try alternative or note and proceed
 - Use `goal_status` to track overall progress
+- Do not set a token_budget unless the user explicitly asked for one

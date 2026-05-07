@@ -1583,7 +1583,6 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               system.push(`<system-reminder>
 You are working toward the following goal: "${goalInfo.objective}"${budgetInfo}
 Use the update_goal tool to update the goal status (active/complete/paused) as you make progress.
-If no token budget is set, you can set one with update_goal to track progress.
 </system-reminder>`)
             } else if (goalInfo && goalInfo.status === "budget_limited") {
               system.push(`<system-reminder>

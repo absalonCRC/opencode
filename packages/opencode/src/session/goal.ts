@@ -174,7 +174,7 @@ export const layer = Layer.effect(
         ),
       )
 
-      if (row.token_budget && newTokensUsed >= row.token_budget && row.tokens_used < row.token_budget) {
+      if (row.token_budget && row.token_budget > 0 && newTokensUsed >= row.token_budget && row.tokens_used < row.token_budget) {
         yield* Effect.sync(() =>
           Database.use((db) =>
             db

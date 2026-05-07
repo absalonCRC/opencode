@@ -10,23 +10,13 @@ $ARGUMENTS
 
 ## How Goal Mode Works
 
-1. Immediately use `update_goal` with `objective` set to the goal description above
+1. Immediately use `update_goal` with `objective` set to the goal description above. Do NOT set a token_budget unless explicitly asked by the user.
 2. Use `update_goal` with `status="complete"` when the goal is fully achieved
-3. Use `goal_status` to check your current progress and budget
-
-### Budget
-
-If you reach **75% of your token budget**, you MUST:
-1. Pause and assess how much progress is truly left
-2. Either: declare the goal complete if major items are done
-3. Or: explicitly prioritize remaining work to fit budget
-
-If you reach **100% of your budget**, the goal loop stops automatically.
+3. Use `goal_status` to check your current progress
 
 ### On Stopping
 
 Goal mode stops when:
-- All success criteria are verified complete
-- Token budget is exhausted
+- The goal is fully achieved (mark it `status="complete"`)
 - You receive a new user message (explicit interruption)
 - An unrecoverable error blocks all possible approaches

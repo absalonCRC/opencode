@@ -3,11 +3,10 @@ Manage the current goal for this session. Use this to set, update, or complete t
 Parameters:
 - objective (optional): The goal description. Set to set or change the goal. Omit to leave unchanged.
 - status (optional): The goal status - "active" (working on it), "complete" (goal achieved), or "paused" (temporarily stopped). Defaults to "active" when setting a new objective.
-- token_budget (optional): Maximum tokens to spend on this goal. Omit for unlimited budget.
+- token_budget (optional): Maximum tokens to spend on this goal. IMPORTANT: only set this if the user explicitly requested a budget. Omit for unlimited budget.
 
 Examples:
-- Set a new goal: objective="Implement user authentication", token_budget=50000
+- Set a new goal: objective="Implement user authentication"
 - Mark goal complete: status="complete"
 - Pause goal: status="paused"
-- Update budget: token_budget=100000
 - Just check status: omit all parameters to see current status
