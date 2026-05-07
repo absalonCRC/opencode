@@ -1391,7 +1391,6 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
         if (input.noReply === true) return message
 
-        const goalMessageId = message.info.id
         let result = yield* loop({ sessionID: input.sessionID })
 
         const MAX_GOAL_CONTINUATIONS = 50
@@ -1402,19 +1401,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           const agent = yield* agents.get(input.agent ?? message.info.agent)
           if (!agent || agent.name === "plan") break
 
-          // Guard: if a real user message arrived since we started the goal loop, stop
-          const latestUser = yield* sessions.findMessage(input.sessionID, (m) => m.info.role === "user")
-          if (Option.isSome(latestUser) && latestUser.value.info.id !== goalMessageId) break
-
-          // Guard: if the last turn made zero tool calls, the agent is stuck — stop
-          const lastAssistant = yield* sessions.findMessage(input.sessionID, (m) => m.info.role === "assistant")
-          if (Option.isSome(lastAssistant.value)) {
-            const hasToolCalls = lastAssistant.value.parts.some((p) => p.type === "tool")
-            if (!hasToolCalls) break
-          }
-
+          // Inject a synthetic continuation message asking the model to keep working.
+          // Store its ID so we can verify the next user message IS this one (not a real user).
+          const contMsgId = MessageID.ascending()
           const contMsg: MessageV2.User = {
-            id: MessageID.ascending(),
+            id: contMsgId,
             sessionID: input.sessionID,
             role: "user",
             time: { created: Date.now() },
