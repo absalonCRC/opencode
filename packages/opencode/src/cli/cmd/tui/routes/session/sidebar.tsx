@@ -58,7 +58,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                   <Show when={goal()}>
                     {(g) => (
                       <text fg={g().status === "active" ? theme.accent : g().status === "complete" ? theme.success : g().status === "paused" ? theme.warning : theme.error}>
-                        {g().status === "active" ? "🎯" : g().status === "complete" ? "✅" : g().status === "paused" ? "⏸" : "⚠"}
+                        ▣
                       </text>
                     )}
                   </Show>

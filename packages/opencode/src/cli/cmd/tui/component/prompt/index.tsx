@@ -1471,10 +1471,15 @@ export function Prompt(props: PromptProps) {
                     const g = goal()
                     return g && (g.status === "active" || g.status === "budget_limited")
                   })
+                  const goalFg = createMemo(() => {
+                    const g = goal()
+                    if (!g) return theme.textMuted
+                    return g.status === "active" ? theme.accent : theme.error
+                  })
                   return (
                     <Show when={showGoal()}>
                       <box flexDirection="row" gap={0} flexShrink={1}>
-                        <text fg={fadeColor(theme.textMuted, agentMetaAlpha())}>·🎯</text>
+                        <text fg={fadeColor(goalFg(), agentMetaAlpha())}>▣</text>
                         <text fg={fadeColor(highlight(), agentMetaAlpha())}>
                           {goal()!.objective.length > 30 ? goal()!.objective.slice(0, 27) + "..." : goal()!.objective}
                         </text>

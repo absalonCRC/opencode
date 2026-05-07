@@ -154,12 +154,18 @@ export function DialogSessionList() {
         const status = sync.data.session_status?.[x.id]
         const isWorking = status?.type === "busy"
         const goal = sync.data.goal[x.id]
+        const goalFg = goal?.status === "active" ? theme.accent : goal?.status === "complete" ? theme.success : goal?.status === "paused" ? theme.warning : goal?.status === "budget_limited" ? theme.error : theme.textMuted
         return {
           title: isDeleting ? `Press ${keybind.print("session_delete")} again to confirm` : x.title,
           bg: isDeleting ? theme.error : undefined,
           value: x.id,
           category,
-          footer: goal ? `${goal.status === "active" ? "🎯" : goal.status === "complete" ? "✅" : goal.status === "paused" ? "⏸" : "⚠"} ${goal.objective}` : footer,
+          footer: goal ? (
+            <box flexDirection="row" gap={1}>
+              <text fg={goalFg}>▣</text>
+              <text fg={theme.textMuted}>{goal.objective}</text>
+            </box>
+          ) : footer,
           gutter: isWorking ? () => <Spinner /> : undefined,
         }
       })
