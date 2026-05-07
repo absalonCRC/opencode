@@ -1464,6 +1464,25 @@ export function Prompt(props: PromptProps) {
                   )}
                 </Show>
               </box>
+              <Show when={props.sessionID}>
+                {(() => {
+                  const goal = createMemo(() => sync.session.goal(props.sessionID!))
+                  const showGoal = createMemo(() => {
+                    const g = goal()
+                    return g && (g.status === "active" || g.status === "budget_limited")
+                  })
+                  return (
+                    <Show when={showGoal()}>
+                      <box flexDirection="row" gap={0} flexShrink={1}>
+                        <text fg={fadeColor(theme.textMuted, agentMetaAlpha())}>·🎯</text>
+                        <text fg={fadeColor(highlight(), agentMetaAlpha())}>
+                          {goal()!.objective.length > 30 ? goal()!.objective.slice(0, 27) + "..." : goal()!.objective}
+                        </text>
+                      </box>
+                    </Show>
+                  )
+                })()}
+              </Show>
               <Show when={hasRightContent()}>
                 <box flexDirection="row" gap={1} alignItems="center">
                   {props.right}

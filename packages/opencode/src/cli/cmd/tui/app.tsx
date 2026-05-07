@@ -823,6 +823,18 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     })
   })
 
+  event.subscribe((raw) => {
+    const event = raw as { type: string; properties: Record<string, any> }
+    if (event.type === "goal.budget_exhausted") {
+      toast.show({
+        variant: "warning",
+        title: "Goal Budget Exhausted",
+        message: `${event.properties.tokensUsed.toLocaleString()} / ${event.properties.tokenBudget.toLocaleString()} tokens used`,
+        duration: 5000,
+      })
+    }
+  })
+
   event.on("installation.update-available", async (evt) => {
     const version = evt.properties.version
 

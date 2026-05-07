@@ -260,6 +260,14 @@ export type TuiKV = {
   readonly ready: boolean
 }
 
+export type TuiSidebarGoalItem = {
+  objective: string
+  status: "active" | "complete" | "paused" | "budget_limited"
+  tokenBudget?: number
+  tokensUsed: number
+  timeUsedSeconds: number
+}
+
 export type TuiState = {
   readonly ready: boolean
   readonly config: SdkConfig
@@ -275,6 +283,7 @@ export type TuiState = {
     count: () => number
     diff: (sessionID: string) => ReadonlyArray<TuiSidebarFileItem>
     todo: (sessionID: string) => ReadonlyArray<TuiSidebarTodoItem>
+    goal: (sessionID: string) => TuiSidebarGoalItem | undefined
     messages: (sessionID: string) => ReadonlyArray<Message>
     status: (sessionID: string) => SessionStatus | undefined
     permission: (sessionID: string) => ReadonlyArray<PermissionRequest>

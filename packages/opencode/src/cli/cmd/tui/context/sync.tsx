@@ -18,6 +18,7 @@ import type {
   ProviderAuthMethod,
   VcsInfo,
 } from "@opencode-ai/sdk/v2"
+import type { TuiSidebarGoalItem } from "@opencode-ai/plugin/tui"
 import { createStore, produce, reconcile } from "solid-js/store"
 import { useProject } from "@tui/context/project"
 import { useEvent } from "@tui/context/event"
@@ -62,6 +63,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       todo: {
         [sessionID: string]: Todo[]
       }
+      goal: {
+        [sessionID: string]: TuiSidebarGoalItem
+      }
       message: {
         [sessionID: string]: Message[]
       }
@@ -97,6 +101,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       session_status: {},
       session_diff: {},
       todo: {},
+      goal: {},
       message: {},
       part: {},
       lsp: [],
@@ -369,6 +374,20 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       }
     })
 
+    event.subscribe((raw) => {
+      const cfg = raw as { type: string; properties: { sessionID: string; goal?: TuiSidebarGoalItem } }
+      if (cfg.type === "goal.set" || cfg.type === "goal.updated") {
+        if (cfg.properties.goal) setStore("goal", cfg.properties.sessionID, cfg.properties.goal)
+      } else if (cfg.type === "goal.cleared") {
+        setStore(
+          "goal",
+          produce((draft) => {
+            delete draft[cfg.properties.sessionID]
+          }),
+        )
+      }
+    })
+
     const exit = useExit()
     const args = useArgs()
 
@@ -511,6 +530,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           if (!last) return "idle"
           if (last.role === "user") return "working"
           return last.time.completed ? "idle" : "working"
+        },
+        goal(sessionID: string) {
+          return store.goal[sessionID]
         },
         async sync(sessionID: string) {
           if (fullSyncedSessions.has(sessionID)) return
