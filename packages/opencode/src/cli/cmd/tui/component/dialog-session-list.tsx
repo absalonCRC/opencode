@@ -153,12 +153,13 @@ export function DialogSessionList() {
         const isDeleting = toDelete() === x.id
         const status = sync.data.session_status?.[x.id]
         const isWorking = status?.type === "busy"
+        const goal = sync.data.goal[x.id]
         return {
           title: isDeleting ? `Press ${keybind.print("session_delete")} again to confirm` : x.title,
           bg: isDeleting ? theme.error : undefined,
           value: x.id,
           category,
-          footer,
+          footer: goal ? `${goal.status === "active" ? "🎯" : goal.status === "complete" ? "✅" : goal.status === "paused" ? "⏸" : "⚠"} ${goal.objective}` : footer,
           gutter: isWorking ? () => <Spinner /> : undefined,
         }
       })

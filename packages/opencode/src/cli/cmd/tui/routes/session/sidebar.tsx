@@ -15,6 +15,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const { theme } = useTheme()
   const tuiConfig = useTuiConfig()
   const session = createMemo(() => sync.session.get(props.sessionID))
+  const goal = createMemo(() => sync.session.goal(props.sessionID))
   const workspace = () => {
     const workspaceID = session()?.workspaceID
     if (!workspaceID) return
@@ -53,9 +54,18 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
               share_url={session()!.share?.url}
             >
               <box paddingRight={1}>
-                <text fg={theme.text}>
-                  <b>{session()!.title}</b>
-                </text>
+                <box flexDirection="row" gap={1}>
+                  <Show when={goal()}>
+                    {(g) => (
+                      <text fg={g().status === "active" ? theme.accent : g().status === "complete" ? theme.success : g().status === "paused" ? theme.warning : theme.error}>
+                        {g().status === "active" ? "🎯" : g().status === "complete" ? "✅" : g().status === "paused" ? "⏸" : "⚠"}
+                      </text>
+                    )}
+                  </Show>
+                  <text fg={theme.text}>
+                    <b>{session()!.title}</b>
+                  </text>
+                </box>
                 <Show when={InstallationChannel !== "latest"}>
                   <text fg={theme.textMuted}>{props.sessionID}</text>
                 </Show>

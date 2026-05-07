@@ -1387,7 +1387,53 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         }
 
         if (input.noReply === true) return message
-        return yield* loop({ sessionID: input.sessionID })
+
+        let result = yield* loop({ sessionID: input.sessionID })
+
+        const MAX_AUTO_CONTINUATIONS = 10
+        for (let i = 0; i < MAX_AUTO_CONTINUATIONS; i++) {
+          const goalInfo = yield* goalsvc.get(input.sessionID)
+          if (!goalInfo || goalInfo.status !== "active") break
+
+          const agent = yield* agents.get(input.agent ?? message.info.agent)
+          if (!agent || agent.name === "plan") break
+
+          const latestUser = yield* sessions.findMessage(input.sessionID, (m) => m.info.role === "user")
+          if (Option.isSome(latestUser) && latestUser.value.info.id !== message.info.id) break
+
+          const contMsg: MessageV2.User = {
+            id: MessageID.ascending(),
+            sessionID: input.sessionID,
+            role: "user",
+            time: { created: Date.now() },
+            agent: message.info.agent,
+            model: message.info.model,
+          }
+          yield* sessions.updateMessage(contMsg)
+          yield* sessions.updatePart({
+            id: PartID.ascending(),
+            messageID: contMsg.id,
+            sessionID: input.sessionID,
+            type: "text",
+            text: [
+              "Continue working toward your goal.",
+              goalInfo.tokenBudget
+                ? `Budget: ${goalInfo.tokensUsed}/${goalInfo.tokenBudget} tokens used.`
+                : "",
+              "Review the previous response and determine what work remains.",
+              "Do not repeat completed work.",
+              "",
+              "If the goal is fully achieved, use update_goal with status=\"complete\".",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+            synthetic: true,
+          })
+
+          result = yield* loop({ sessionID: input.sessionID })
+        }
+
+        return result
       },
     )
 
