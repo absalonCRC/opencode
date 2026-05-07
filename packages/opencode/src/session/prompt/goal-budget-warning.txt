@@ -1,15 +1,12 @@
-## Goal Mode: Budget Warning
+The active thread goal is approaching its token budget.
 
-You have used **75% of your token budget** for this goal.
+<budget>
+- Time spent pursuing goal: {{ time_used_seconds }} seconds
+- Tokens used: {{ tokens_used }}
+- Token budget: {{ token_budget }}
+- Tokens remaining: {{ remaining_tokens }}
+</budget>
 
-**Required Assessment:**
-1. How much progress has been made toward the goal?
-2. What specific items remain?
-3. Can the remaining work be completed within the remaining budget?
+You have limited budget remaining. Prioritize completing the core objective over peripheral improvements. If the goal is not achievable within the remaining budget, wrap up and communicate what remains to the user.
 
-**Options:**
-- If major items are complete and the core goal is achieved: use `update_goal` with `status="complete"` to declare success
-- If significant work remains: prioritize explicitly and continue with only the most critical items
-- If the remaining work would exceed budget: summarize what was accomplished and what remains, then call `update_goal` with `status="paused"`
-
-**Do not continue working without making this assessment.**
+Do not call update_goal unless the goal is actually complete.
