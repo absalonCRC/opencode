@@ -5,6 +5,8 @@ import { SyncEvent } from "@/sync"
 import * as Session from "./session"
 import { MessageV2 } from "./message-v2"
 import { SessionTable, MessageTable, PartTable } from "./session.sql"
+import { GoalTable } from "./goal.sql"
+import * as Goal from "./goal"
 import { Log } from "@opencode-ai/core/util/log"
 import nextProjectors from "./projectors-next"
 
@@ -136,6 +138,22 @@ export default [
       if (!foreign(err)) throw err
       log.warn("ignored late part update", { partID: id, messageID, sessionID })
     }
+  }),
+
+  // Goal projectors — GoalTable is already defined in goal.sql.ts
+  SyncEvent.project(Goal.Event.Set, (db, data) => {
+    // Goal is already inserted by the service; projector is a no-op.
+    // Its purpose is to register the event type so SyncEvent knows about it.
+    void data
+  }),
+
+  SyncEvent.project(Goal.Event.Updated, (db, data) => {
+    void db
+    void data
+  }),
+
+  SyncEvent.project(Goal.Event.Cleared, (db, data) => {
+    db.delete(GoalTable).where(eq(GoalTable.session_id, data.sessionID)).run()
   }),
 
   ...nextProjectors,

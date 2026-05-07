@@ -3,7 +3,10 @@ import { SyncEvent } from "@/sync"
 import { Session } from "@/session/session"
 import { SessionTable } from "@/session/session.sql"
 import { Database } from "@/storage/db"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
+import { GoalTable } from "@/storage/schema"
+import type { Info as GoalInfo } from "@/session/goal"
+import { fromRow as goalFromRow } from "@/session/goal"
 
 export function initProjectors() {
   SyncEvent.init({
@@ -19,6 +22,17 @@ export function initProjectors() {
           sessionID: id,
           info: Session.fromRow(row),
         }
+      }
+      if (type === "goal.set" || type === "goal.updated") {
+        const sessionID = (data as { sessionID: string }).sessionID
+        const row = Database.use((db) =>
+          db.select().from(GoalTable).where(sql`${GoalTable.session_id} = ${sessionID}`).get(),
+        )
+        if (!row) return { sessionID, goal: null as GoalInfo | null }
+        return { sessionID, goal: goalFromRow(row) }
+      }
+      if (type === "goal.cleared") {
+        return data
       }
       return data
     },
