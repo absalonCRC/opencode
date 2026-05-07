@@ -1469,12 +1469,14 @@ export function Prompt(props: PromptProps) {
                   const goal = createMemo(() => sync.session.goal(props.sessionID!))
                   const showGoal = createMemo(() => {
                     const g = goal()
-                    return g && (g.status === "active" || g.status === "budget_limited")
+                    return g && (g.status === "active" || g.status === "paused" || g.status === "budget_limited")
                   })
                   const goalFg = createMemo(() => {
                     const g = goal()
                     if (!g) return theme.textMuted
-                    return g.status === "active" ? theme.accent : theme.error
+                    if (g.status === "active") return theme.accent
+                    if (g.status === "paused") return theme.warning
+                    return theme.error
                   })
                   return (
                     <Show when={showGoal()}>

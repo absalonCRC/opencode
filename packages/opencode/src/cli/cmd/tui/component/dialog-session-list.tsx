@@ -128,10 +128,10 @@ export function DialogSessionList() {
       .map((x) => {
         const workspace = x.workspaceID ? project.workspace.get(x.workspaceID) : undefined
 
-        let footer: JSX.Element | string = ""
+        let baseFooter: JSX.Element | string = ""
         if (Flag.OPENCODE_EXPERIMENTAL_WORKSPACES) {
           if (x.workspaceID) {
-            footer = workspace ? (
+            baseFooter = workspace ? (
               <WorkspaceLabel
                 type={workspace.type}
                 name={workspace.name}
@@ -142,7 +142,7 @@ export function DialogSessionList() {
             )
           }
         } else {
-          footer = Locale.time(x.time.updated)
+          baseFooter = Locale.time(x.time.updated)
         }
 
         const date = new Date(x.time.updated)
@@ -155,17 +155,23 @@ export function DialogSessionList() {
         const isWorking = status?.type === "busy"
         const goal = sync.data.goal[x.id]
         const goalFg = goal?.status === "active" ? theme.accent : goal?.status === "complete" ? theme.success : goal?.status === "paused" ? theme.warning : goal?.status === "budget_limited" ? theme.error : theme.textMuted
+        const goalObjective = goal && goal.objective.length > 28 ? goal.objective.slice(0, 25) + "..." : goal?.objective
         return {
           title: isDeleting ? `Press ${keybind.print("session_delete")} again to confirm` : x.title,
           bg: isDeleting ? theme.error : undefined,
           value: x.id,
           category,
           footer: goal ? (
-            <box flexDirection="row" gap={1}>
-              <text fg={goalFg}>▣</text>
-              <text fg={theme.textMuted}>{goal.objective}</text>
+            <box gap={1}>
+              <box flexDirection="row" gap={1}>
+                {baseFooter}
+              </box>
+              <box flexDirection="row" gap={1}>
+                <text fg={goalFg}>▣</text>
+                <text fg={theme.textMuted}>{goalObjective}</text>
+              </box>
             </box>
-          ) : footer,
+          ) : baseFooter,
           gutter: isWorking ? () => <Spinner /> : undefined,
         }
       })
