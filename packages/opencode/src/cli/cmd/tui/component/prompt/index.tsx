@@ -1481,8 +1481,8 @@ export function Prompt(props: PromptProps) {
                   return (
                     <Show when={showGoal()}>
                       <box flexDirection="row" gap={0} flexShrink={1}>
-                        <text fg={fadeColor(goalFg(), agentMetaAlpha())}>▣</text>
-                        <text fg={fadeColor(highlight(), agentMetaAlpha())}>
+                        <text fg={goalFg()}>▣</text>
+                        <text fg={theme.text}>
                           {goal()!.objective.length > 30 ? goal()!.objective.slice(0, 27) + "..." : goal()!.objective}
                         </text>
                       </box>

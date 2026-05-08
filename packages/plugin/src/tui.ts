@@ -266,6 +266,7 @@ export type TuiSidebarGoalItem = {
   tokenBudget?: number
   tokensUsed: number
   timeUsedSeconds: number
+  timeUpdated: number
 }
 
 export type TuiState = {
