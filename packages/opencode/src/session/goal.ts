@@ -65,14 +65,16 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionGoal") {}
 
-const fromRow = (row: typeof GoalTable.$inferSelect): Info => ({
+export function fromRow(row: typeof GoalTable.$inferSelect): Info {
+  return {
   objective: row.objective,
   status: row.status as Status,
   tokenBudget: row.token_budget ?? undefined,
   tokensUsed: row.tokens_used,
   timeUsedSeconds: row.time_used_seconds,
   timeUpdated: row.time_updated,
-})
+  }
+}
 
 export const layer = Layer.effect(
   Service,
