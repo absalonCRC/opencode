@@ -266,7 +266,7 @@ export type TuiSidebarGoalItem = {
   tokenBudget?: number
   tokensUsed: number
   timeUsedSeconds: number
-  _updated: number // Unix ms timestamp of last update, for live timer
+  timeUpdated: number
 }
 
 export type TuiState = {
