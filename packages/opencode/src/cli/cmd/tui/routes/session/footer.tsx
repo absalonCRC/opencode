@@ -29,16 +29,48 @@ export function Footer() {
   const directory = useDirectory()
   const connected = useConnected()
 
-  // Goal timer — live counter ticking every second while goal is active
+  // Goal — raw store value
   const goal = createMemo(() => {
     if (route.data.type !== "session") return undefined
     return sync.session.goal(route.data.sessionID)
   })
-  const [tick, setTick] = createSignal(0)
 
+  // Goal with live elapsed time (ticks every second)
+  const [tick, setTick] = createSignal(0)
   onMount(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000)
     onCleanup(() => clearInterval(id))
+  })
+
+  const goalProxy = createMemo(() => {
+    tick() // subscribe to tick to force re-evaluation
+    const g = goal()
+    if (!g) return undefined
+    // liveSeconds = recorded seconds + seconds since last DB update
+    const liveSeconds = g.timeUsedSeconds + Math.floor((Date.now() - g._updated) / 1000)
+    return { ...g, liveSeconds }
+  })
+
+  const goalColor = createMemo(() => {
+    const g = goal()
+    if (!g) return undefined
+    switch (g.status) {
+      case "active":
+        return theme.accent
+      case "complete":
+        return theme.success
+      case "paused":
+        return theme.warning
+      case "budget_limited":
+        return theme.error
+    }
+  })
+
+  const goalLabel = createMemo(() => {
+    const g = goal()
+    if (!g) return undefined
+    const base = g.status === "active" ? "Goal" : g.status === "complete" ? "Goal ✓" : `Goal (${g.status})`
+    return base
   })
 
   const [store, setStore] = createStore({
@@ -70,35 +102,6 @@ export function Footer() {
     })
   })
 
-  const goalColor = createMemo(() => {
-    const g = goal()
-    if (!g) return undefined
-    switch (g.status) {
-      case "active":
-        return theme.accent
-      case "complete":
-        return theme.success
-      case "paused":
-        return theme.warning
-      case "budget_limited":
-        return theme.error
-    }
-  })
-
-  const goalLabel = createMemo(() => {
-    const g = goal()
-    if (!g) return undefined
-    const base = g.status === "active" ? "Goal" : g.status === "complete" ? "Goal ✓" : `Goal (${g.status})`
-    return base
-  })
-
-  // Proxy access to goal() to trigger reactivity from tick signal
-  const goalProxy = createMemo(() => {
-    tick() // subscribe to tick
-    const g = goal()
-    return g
-  })
-
   return (
     <box flexDirection="row" justifyContent="space-between" gap={1} flexShrink={0}>
       <box flexDirection="row" gap={1} flexShrink={0}>
@@ -109,7 +112,7 @@ export function Footer() {
               <text fg={goalColor()}>
                 <b>{goalLabel()}</b>
               </text>
-              <text fg={theme.textMuted}>{formatDuration(g().timeUsedSeconds)}</text>
+              <text fg={theme.textMuted}>{formatDuration(g().liveSeconds)}</text>
             </>
           )}
         </Show>

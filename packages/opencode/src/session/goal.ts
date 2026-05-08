@@ -16,6 +16,7 @@ export const Info = Schema.Struct({
   tokenBudget: Schema.optional(Schema.Number).annotate({ description: "null means unlimited" }),
   tokensUsed: Schema.Number,
   timeUsedSeconds: Schema.Number,
+  _updated: Schema.Number, // Unix ms timestamp, for live timer in TUI
 })
 export type Info = Schema.Schema.Type<typeof Info>
 
@@ -85,6 +86,7 @@ export function fromRow(row: typeof GoalTable.$inferSelect): Info {
     tokenBudget: row.token_budget ?? undefined,
     tokensUsed: row.tokens_used,
     timeUsedSeconds: row.time_used_seconds,
+    _updated: row.time_updated,
   }
 }
 
